@@ -223,7 +223,7 @@ local accept = {
     ['string']     = true,
     ['boolean']    = true,
     ['number']     = true,
-    ['integer']     = true,
+    ['integer']    = true,
     ['nil']        = true,
 }
 
