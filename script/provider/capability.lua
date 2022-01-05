@@ -86,6 +86,7 @@ function m.getIniter()
                 'lua.jsonToLua',
                 'lua.setConfig',
                 'lua.autoRequire',
+                'lua.quickfix.module'
             },
         },
         foldingRangeProvider = true,

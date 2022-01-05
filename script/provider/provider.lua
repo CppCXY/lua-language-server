@@ -102,15 +102,15 @@ m.register 'initialize' {
         end
 
         return {
-            capabilities = cap.getIniter(),
-            serverInfo   = {
-                name    = 'sumneko.lua',
+            capabilities  = cap.getIniter(),
+            serverInfo    = {
+                name = 'sumneko.lua',
             },
         }
     end
 }
 
-m.register 'initialized'{
+m.register 'initialized' {
     ---@async
     function (params)
         files.init()
@@ -768,7 +768,7 @@ m.register 'workspace/executeCommand' {
         elseif command == 'lua.setConfig' then
             local core = require 'core.command.setConfig'
             return core(params.arguments[1])
-        elseif command == 'lua.autoRequire' then
+        elseif command == 'lua.autoRequire' or command == "lua.quickfix.module" then
             local core = require 'core.command.autoRequire'
             return core(params.arguments[1])
         end
