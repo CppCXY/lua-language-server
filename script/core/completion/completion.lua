@@ -504,7 +504,8 @@ local function checkFieldThen(state, name, src, word, startPos, position, parent
     local kind = define.CompletionItemKind.Field
     if (value.type == 'function' and not vm.isVarargFunctionWithOverloads(value))
     or value.type == 'doc.type.function' then
-        if oop then
+        local isMethod = value.parent.type == 'setmethod'
+        if isMethod then
             kind = define.CompletionItemKind.Method
         else
             kind = define.CompletionItemKind.Function
@@ -512,6 +513,7 @@ local function checkFieldThen(state, name, src, word, startPos, position, parent
         buildFunction(results, src, value, oop, {
             label      = name,
             kind       = kind,
+            isMethod   = isMethod,
             match      = name:match '^[^(]+',
             insertText = name:match '^[^(]+',
             deprecated = vm.getDeprecated(src) and true or nil,
@@ -626,11 +628,42 @@ local function checkFieldOfRefs(refs, state, word, startPos, position, parent, o
         end
         ::CONTINUE::
     end
+
+    local fieldResults = {}
     for name, src in util.sortPairs(fields) do
         if src then
-            checkFieldThen(state, name, src, word, startPos, position, parent, oop, results)
+            checkFieldThen(state, name, src, word, startPos, position, parent, oop, fieldResults)
             await.delay()
         end
+    end
+
+    local scoreMap = {}
+    for i, res in ipairs(fieldResults) do
+        scoreMap[res] = i
+    end
+    table.sort(fieldResults, function (a, b)
+        local score1 = scoreMap[a]
+        local score2 = scoreMap[b]
+        if oop then
+            if not a.isMethod then
+                score1 = score1 + 10000
+            end
+            if not b.isMethod then
+                score2 = score2 + 10000
+            end
+        else
+            if a.isMethod then
+                score1 = score1 + 10000
+            end
+            if b.isMethod then
+                score2 = score2 + 10000
+            end
+        end
+        return score1 < score2
+    end)
+
+    for _, res in ipairs(fieldResults) do
+        results[#results+1] = res
     end
 end
 
@@ -1539,14 +1572,13 @@ local function checkTableLiteralField(state, position, tbl, fields, results)
         end
     end
     if left then
-        local hasResult = false
+        local fieldResults = {}
         for _, field in ipairs(fields) do
             local name = guide.getKeyName(field)
             if  name
             and not mark[name]
             and matchKey(left, tostring(name)) then
-                hasResult = true
-                results[#results+1] = {
+                local res = {
                     label      = guide.getKeyName(field),
                     kind       = define.CompletionItemKind.Property,
                     id         = stack(field, function (newField) ---@async
@@ -1556,9 +1588,20 @@ local function checkTableLiteralField(state, position, tbl, fields, results)
                         }
                     end),
                 }
+                if field.optional
+                or vm.compileNode(field):isNullable() then
+                    res.insertText = res.label
+                    res.label      = res.label.. '?'
+                end
+                fieldResults[#fieldResults+1] = res
             end
         end
-        return hasResult
+        util.sortByScore(fieldResults, {
+            function (r) return r.insertText and 0 or 1 end,
+            util.sortCallbackOfIndex(fieldResults),
+        })
+        util.arrayMerge(results, fieldResults)
+        return #fieldResults > 0
     end
 end
 
@@ -1571,6 +1614,7 @@ local function tryCallArg(state, position, results)
     if arg and arg.type == 'function' then
         return
     end
+    ---@diagnostic disable-next-line: missing-fields
     local node = vm.compileCallArg({ type = 'dummyarg' }, call, argIndex)
     if not node then
         return
