@@ -17,6 +17,8 @@ elseif platform.os == 'windows' then
         lm.arch = "x86"
     elseif lm.platform == "win32-x64" then
         lm.arch = "x86_64"
+    elseif lm.platform == "win32-arm64" then
+        lm.arch = "arm64"
     else
         error "unknown platform"
     end
